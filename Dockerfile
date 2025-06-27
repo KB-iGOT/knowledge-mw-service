@@ -1,27 +1,15 @@
-FROM circleci/node:8.11.2-stretch
-MAINTAINER "Manojvv" "manojv@ilimi.in"
-USER root
-COPY src /opt/content/
+FROM node:22.15-slim
+RUN apt-get update && apt-get install -y git
+COPY . /opt/content/
 WORKDIR /opt/content/
-RUN npm install --unsafe-perm
+RUN git config --global --add safe.directory /opt/content
+RUN git submodule init && \
+    git submodule update
+RUN cd src && npm install --unsafe-perm --production
 
-FROM node:8.11-slim
-MAINTAINER "Manojvv" "manojv@ilimi.in"
-# Use a local mirror for Debian Jessie
-RUN echo "deb http://archive.debian.org/debian/ jessie main" > /etc/apt/sources.list
-RUN echo "deb-src http://archive.debian.org/debian/ jessie main" >> /etc/apt/sources.list
-RUN echo "deb http://archive.debian.org/debian-security/ jessie/updates main" >> /etc/apt/sources.list
-RUN echo "deb-src http://archive.debian.org/debian-security/ jessie/updates main" >> /etc/apt/sources.list
-RUN apt-get -o Acquire::Check-Valid-Until=false update
-RUN apt install openssl imagemagick -y --force-yes \
-    && apt-get clean \
-    && useradd -m sunbird
-USER sunbird
-ADD ImageMagick-i386-pc-solaris2.11.tar.gz /home/sunbird
-ENV GRAPH_HOME "/home/sunbird/ImageMagick-6.9.3"
-ENV PATH "$GRAPH_HOME/bin:$PATH"
-ENV MAGICK_HOME "/home/sunbird/ImageMagick-6.9.3"
-ENV PATH "$MAGICK_HOME/bin:$PATH"
+FROM node:22.15-slim
+
+RUN useradd -m sunbird
 COPY --from=0 --chown=sunbird /opt/content /home/sunbird/mw/content
-WORKDIR /home/sunbird/mw/content/
+WORKDIR /home/sunbird/mw/content/src
 CMD ["node", "app.js", "&"]

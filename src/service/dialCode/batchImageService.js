@@ -16,24 +16,24 @@ var batchModelProperties = ['processid', 'dialcodes', 'config', 'status', 'chann
 var KafkaService = require('./../../helpers/qrCodeKafkaProducer.js')
 
 const defaultConfig = {
-  "errorCorrectionLevel": "H",
-  "pixelsPerBlock": 2,
-  "qrCodeMargin": 3,
-  "textFontName": "Verdana",
-  "textFontSize": 11,
-  "textCharacterSpacing": 0.1,
-  "imageFormat": "png",
-  "colourModel": "Grayscale",
-  "imageBorderSize": 1
+  'errorCorrectionLevel': 'H',
+  'pixelsPerBlock': 2,
+  'qrCodeMargin': 3,
+  'textFontName': 'Verdana',
+  'textFontSize': 11,
+  'textCharacterSpacing': 0.1,
+  'imageFormat': 'png',
+  'colourModel': 'Grayscale',
+  'imageBorderSize': 1
 }
 
-function BatchImageService(config) {
-  this.config = _.merge(defaultConfig, config);
+function BatchImageService (config) {
+  this.config = _.merge(defaultConfig, config)
 }
 
 BatchImageService.prototype.createRequest = function (data, channel, publisher, rspObj, callback) {
   var processId = dbModel.uuid()
-  var dialcodes = _.map(data.dialcodes, 'text');
+  var dialcodes = _.map(data.dialcodes, 'text')
   // Below line added for ignore eslint camel case issue.
   /* eslint new-cap: ["error", { "newIsCap": false }] */
   var batch = new dbModel.instance.dialcode_batch({
@@ -60,7 +60,7 @@ BatchImageService.prototype.createRequest = function (data, channel, publisher, 
       logger.error({ msg: 'Error while inserting record', error })
       callback(error, null)
     } else {
-      data.processId = processId;
+      data.processId = processId
       KafkaService.sendRecord(data, function (err, res) {
         if (err) {
           logger.error({ msg: 'Error while sending record to kafka', err, additionalInfo: { data } })
@@ -69,80 +69,13 @@ BatchImageService.prototype.createRequest = function (data, channel, publisher, 
           callback(null, processId)
         }
       })
-      //TODO: Send to Kafka
-
+      // TODO: Send to Kafka
     }
-  })
-}
-
-BatchImageService.prototype.getStatus = function (rspObj, processId) {
-  return new Promise(function (resolve, reject) {
-    try {
-      var processUUId = dbModel.uuidFromString(processId)
-    } catch (e) {
-      console.log('err', e)
-      rspObj.errCode = dialCodeMessage.PROCESS.NOTFOUND_CODE
-      rspObj.errMsg = dialCodeMessage.PROCESS.NOTFOUND_MESSAGE
-      rspObj.responseCode = responseCode.RESOURCE_NOT_FOUND
-      logger.error({
-        msg: 'Requested process id not found',
-        err: {
-          error: e,
-          errCode: rspObj.errCode,
-          errMsg: rspObj.errMsg,
-          responseCode: rspObj.responseCode
-        },
-        additionalInfo: {processId}
-      })
-      reject(new Error(JSON.stringify({ code: 404, data: respUtil.errorResponse(rspObj) })))
-    }
-    dbModel.instance.dialcode_batch.findOne({ processid: processUUId }, function (err, batch) {
-      if (err) {
-        rspObj.errCode = dialCodeMessage.PROCESS.FAILED_CODE
-        rspObj.errMsg = dialCodeMessage.PROCESS.FAILED_MESSAGE
-        rspObj.responseCode = responseCode.SERVER_ERROR
-        logger.error({
-          msg: 'Unable to get the process info',
-          err: {
-            err,
-            errCode: rspObj.errCode,
-            errMsg: rspObj.errMsg,
-            responseCode: rspObj.responseCode
-          },
-          additionalInfo: {processId: processUUId}
-        })
-        reject(new Error(JSON.stringify({ code: 500, data: respUtil.errorResponse(rspObj) })))
-      } else if (!batch) {
-        rspObj.errCode = dialCodeMessage.PROCESS.NOTFOUND_CODE
-        rspObj.errMsg = dialCodeMessage.PROCESS.NOTFOUND_MESSAGE
-        rspObj.responseCode = responseCode.RESOURCE_NOT_FOUND
-        logger.error({
-          msg: 'missing batch with given process id',
-          err: {
-            errCode: rspObj.errCode,
-            errMsg: rspObj.errMsg,
-            responseCode: rspObj.responseCode
-          },
-          additionalInfo: {processId: processUUId, batch}
-        })
-        reject(new Error(JSON.stringify({ code: 404, data: respUtil.errorResponse(rspObj) })))
-      } else {
-        if (batch.status !== 2) {
-          rspObj.result.status = dialCodeMessage.PROCESS.INPROGRESS_MESSAGE
-          resolve({ code: 200, data: respUtil.successResponse(rspObj) })
-        } else {
-          rspObj.result.status = dialCodeMessage.PROCESS.COMPLETED
-          rspObj.result.url = batch.url
-          resolve({ code: 200, data: respUtil.successResponse(rspObj) })
-        }
-      }
-    })
   })
 }
 
 BatchImageService.prototype.configToString = function () {
   return _.mapValues(this.config, _.method('toString'))
 }
-
 
 module.exports = BatchImageService

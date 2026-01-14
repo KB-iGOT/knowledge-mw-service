@@ -286,7 +286,7 @@ function apiAccessForReviewerUser (req, response, next) {
   var data = {}
   var rspObj = req.rspObj
   var qs = {
-    fields: 'createdBy,collaborators',
+    fields: 'createdBy,collaborators,courseCategory',
     mode: 'edit'
   }
   var contentMessage = messageUtil.CONTENT
@@ -320,6 +320,15 @@ function apiAccessForReviewerUser (req, response, next) {
         })
     },
     function (res) {
+      // Bypass authorization check if courseCategory is 'Learning Pathway'
+      if (res.result.content.courseCategory === 'Learning Pathway') {
+        logger.info({
+          msg: 'Bypassing authorization check for Learning Pathway',
+          additionalInfo: { courseCategory: res.result.content.courseCategory, userId: userId }
+        }, req)
+        return next()
+      }
+      
       if (res.result.content.createdBy === userId || lodash.includes(res.result.content.collaborators, userId)) {
         rspObj.errCode = reqMsg.TOKEN.INVALID_CODE
         rspObj.errMsg = reqMsg.TOKEN.INVALID_MESSAGE

@@ -154,6 +154,21 @@ module.exports = function (app) {
       contentService.publishContentAPI
     )
 
+  // Org-scoped publish variant: reuses the same publishContentAPI handler (and hence the
+  // same downstream PUBLISH_CONTENT_URI call), only the access-gate middleware differs -
+  // Draft-status content is allowed through purely on the caller's org matching createdFor.
+  app
+    .route(
+      '/action' + configUtil.getConfig('PUBLISH_CONTENT_URI') + '/org/:contentId'
+    )
+    .post(
+      requestMiddleware.gzipCompression(),
+      requestMiddleware.createAndValidateRequestBody,
+      requestMiddleware.validateToken,
+      requestMiddleware.apiAccessForOrgPublish,
+      contentService.publishContentAPI
+    )
+
   app
     .route(
       '/action' + configUtil.getConfig('REJECT_CONTENT_URI') + '/:contentId'

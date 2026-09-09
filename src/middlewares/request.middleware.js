@@ -286,10 +286,11 @@ function apiAccessForReviewerUser (req, response, next) {
   var data = {}
   var rspObj = req.rspObj
   var qs = {
-    fields: 'createdBy,collaborators,courseCategory',
+    fields: 'createdBy,collaborators,courseCategory,status',
     mode: 'edit'
   }
   var contentMessage = messageUtil.CONTENT
+  var reviewableStatus = ['Review', 'FlagReview']
 
   data.contentId = req.params.contentId
 
@@ -328,7 +329,25 @@ function apiAccessForReviewerUser (req, response, next) {
         }, req)
         return next()
       }
-      
+
+      // Only content in Review/FlagReview is eligible for the reviewer-publish flow.
+      // (Draft content is handled separately via apiAccessForOrgPublish.)
+      if (!lodash.includes(reviewableStatus, res.result.content.status)) {
+        rspObj.errCode = contentMessage.PUBLISH.NOT_IN_REVIEW_CODE
+        rspObj.errMsg = contentMessage.PUBLISH.NOT_IN_REVIEW_MESSAGE
+        rspObj.responseCode = responseCode.CLIENT_ERROR
+        logger.error({
+          msg: 'Publish denied - content not in Review/FlagReview status',
+          additionalInfo: { contentId: data.contentId, status: res.result.content.status },
+          err: {
+            errCode: rspObj.errCode,
+            errMsg: rspObj.errMsg,
+            responseCode: rspObj.responseCode
+          }
+        }, req)
+        return response.status(400).send(respUtil.errorResponse(rspObj))
+      }
+
       if (res.result.content.createdBy === userId || lodash.includes(res.result.content.collaborators, userId)) {
         rspObj.errCode = reqMsg.TOKEN.INVALID_CODE
         rspObj.errMsg = reqMsg.TOKEN.INVALID_MESSAGE
@@ -345,6 +364,91 @@ function apiAccessForReviewerUser (req, response, next) {
       } else {
         next()
       }
+    }
+  ])
+}
+
+/**
+ * [apiAccessForOrgPublish - allow publish only for Draft content, gated purely on the
+ * logged-in user's org (not identity) being present in the content's createdFor list]
+ * @param  {[type]}   req
+ * @param  {[type]}   response
+ * @param  {Function} next
+ */
+function apiAccessForOrgPublish (req, response, next) {
+  logger.debug({ msg: 'apiAccessForOrgPublish() called' }, req)
+  var userOrgId = req.get('x-authenticated-user-orgid') || req.get('x-channel-id')
+  var data = {}
+  var rspObj = req.rspObj
+  var qs = {
+    fields: 'status,createdFor',
+    mode: 'edit'
+  }
+
+  data.contentId = req.params.contentId
+
+  async.waterfall([
+
+    function (CBW) {
+      contentProvider.getContentUsingQuery(data.contentId, qs, req.headers,
+        function (err, res) {
+          if (err || res.responseCode !== responseCode.SUCCESS) {
+            rspObj.errCode = res && res.params ? res.params.err : messageUtil.CONTENT.GET.FAILED_CODE
+            rspObj.errMsg = res && res.params ? res.params.errmsg : messageUtil.CONTENT.GET.FAILED_MESSAGE
+            rspObj.responseCode = res && res.responseCode ? res.responseCode : responseCode.SERVER_ERROR
+            logger.error({
+              msg: 'Getting error from content provider',
+              err: {
+                err,
+                errCode: rspObj.errCode,
+                errMsg: rspObj.errMsg,
+                responseCode: rspObj.responseCode
+              },
+              additionalInfo: { qs }
+            }, req)
+            var httpStatus = res && res.statusCode >= 100 && res.statusCode < 600 ? res.statusCode : 500
+            return response.status(httpStatus).send(respUtil.errorResponse(rspObj))
+          } else {
+            CBW(null, res)
+          }
+        })
+    },
+    function (res) {
+      var content = res.result.content
+
+      if (content.status !== 'Draft') {
+        rspObj.errCode = messageUtil.CONTENT.PUBLISH.NOT_IN_DRAFT_CODE
+        rspObj.errMsg = messageUtil.CONTENT.PUBLISH.NOT_IN_DRAFT_MESSAGE
+        rspObj.responseCode = responseCode.CLIENT_ERROR
+        logger.error({
+          msg: 'Org publish denied - content not in Draft status',
+          additionalInfo: { contentId: data.contentId, status: content.status },
+          err: {
+            errCode: rspObj.errCode,
+            errMsg: rspObj.errMsg,
+            responseCode: rspObj.responseCode
+          }
+        }, req)
+        return response.status(400).send(respUtil.errorResponse(rspObj))
+      }
+
+      if (!userOrgId || !lodash.includes(content.createdFor, userOrgId)) {
+        rspObj.errCode = reqMsg.TOKEN.INVALID_CODE
+        rspObj.errMsg = reqMsg.TOKEN.INVALID_MESSAGE
+        rspObj.responseCode = responseCode.UNAUTHORIZED_ACCESS
+        logger.error({
+          msg: 'Org publish denied - user org not in createdFor',
+          additionalInfo: { contentId: data.contentId, userOrgId: userOrgId, createdFor: content.createdFor },
+          err: {
+            errCode: rspObj.errCode,
+            errMsg: rspObj.errMsg,
+            responseCode: rspObj.responseCode
+          }
+        }, req)
+        return response.status(401).send(respUtil.errorResponse(rspObj))
+      }
+
+      next()
     }
   ])
 }
@@ -475,6 +579,7 @@ function seteTextbook (req, res, next) {
 module.exports.validateToken = validateToken
 module.exports.createAndValidateRequestBody = createAndValidateRequestBody
 module.exports.apiAccessForReviewerUser = apiAccessForReviewerUser
+module.exports.apiAccessForOrgPublish = apiAccessForOrgPublish
 module.exports.apiAccessForCreatorUser = apiAccessForCreatorUser
 module.exports.hierarchyUpdateApiAccess = hierarchyUpdateApiAccess
 module.exports.checkChannelID = checkChannelID

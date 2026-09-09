@@ -47,9 +47,9 @@ module.exports = function (app) {
       requestMiddleware.createAndValidateRequestBody, requestMiddleware.validateToken,
       requestMiddleware.apiAccessForReviewerUser, contentService.publishContentAPI)
 
-  // Org-scoped publish: allows publish only when content status is Draft and the
+  // self publish: allows publish only when content status is Draft and the
   // logged-in user's org is present in the content's createdFor list (no identity check).
-  app.route(BASE_URL + '/publish/org/:contentId')
+  app.route(BASE_URL + '/self/publish/:contentId')
     .post(healthService.checkDependantServiceHealth(dependentServiceHealth),
       requestMiddleware.gzipCompression(),
       requestMiddleware.createAndValidateRequestBody, requestMiddleware.validateToken,

@@ -159,7 +159,7 @@ module.exports = function (app) {
   // Draft-status content is allowed through purely on the caller's org matching createdFor.
   app
     .route(
-      '/action' + configUtil.getConfig('PUBLISH_CONTENT_URI') + '/org/:contentId'
+      '/action' + configUtil.getConfig('CA_PUBLISH_URI') + '/:contentId'
     )
     .post(
       requestMiddleware.gzipCompression(),

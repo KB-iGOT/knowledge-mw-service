@@ -8,6 +8,7 @@
         "GET_CONTENT_URI": "/content/v3/read",
         "REVIEW_CONTENT_URI": "/content/v3/review",
         "PUBLISH_CONTENT_URI": "/content/v3/publish",
+        "CA_PUBLISH_URI": "/ca/v1/publish",
         "LIST_CONTENT_URI": "/content/v3/list",
         "RETIRE_CONTENT_URI": "/content/v3/retire",
         "UPLOAD_CONTENT_URI": "/content/v3/upload",

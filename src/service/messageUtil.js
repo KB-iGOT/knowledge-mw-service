@@ -112,7 +112,11 @@ exports.CONTENT = {
     MISSING_CODE: 'ERR_CONTENT_PUBLISH_FIELDS_MISSING',
     MISSING_MESSAGE: 'Required fields for publish content are missing',
     FAILED_CODE: 'ERR_CONTENT_PUBLISH_FAILED',
-    FAILED_MESSAGE: 'Publish content failed'
+    FAILED_MESSAGE: 'Publish content failed',
+    NOT_IN_REVIEW_CODE: 'ERR_CONTENT_NOT_REVIEWED',
+    NOT_IN_REVIEW_MESSAGE: 'Content is not yet reviewed',
+    NOT_IN_DRAFT_CODE: 'ERR_CONTENT_NOT_DRAFT',
+    NOT_IN_DRAFT_MESSAGE: 'The content is not available as Draft'
   },
 
   GET: {

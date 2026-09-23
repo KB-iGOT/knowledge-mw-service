@@ -1004,8 +1004,12 @@ function retireContentAPI (req, response) {
     },
 
     function (res, CBW) {
-      var status = _.uniq(_.pluck(res.result.content, 'status'))
-      if (status.length === 1 && status[0] === 'Draft') {
+      // Comprehensive Assessment content is exempt from the Draft-only retire restriction -
+      // it can be retired regardless of its current status.
+      var isValidForRetire = _.every(res.result.content, function (content) {
+        return content.status === 'Draft' || content.courseCategory === 'Comprehensive Assessment'
+      })
+      if (isValidForRetire) {
         CBW()
       } else {
         rspObj.errCode = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_ONLY_DRAFT_CODE
@@ -1763,8 +1767,8 @@ function copyContentAPI (req, response) {
   data.contentId = req.params.contentId
   var rspObj = req.rspObj
   var query = {}
-  if (req.query){
-    query = req.query;
+  if (req.query) {
+    query = req.query
   }
 
   logger.debug({
@@ -1921,7 +1925,7 @@ function searchPluginsAPI (req, response, objectType) {
 function validateContentLock (req, response) {
   var rspObj = req.rspObj
   var userId = req.get('x-authenticated-userid')
-  var isRootOrgAdmin = lodash.has(req.body.request, "isRootOrgAdmin") ? req.body.request.isRootOrgAdmin : false
+  var isRootOrgAdmin = lodash.has(req.body.request, 'isRootOrgAdmin') ? req.body.request.isRootOrgAdmin : false
   logger.debug({ msg: 'contentService.validateContentLock() called', additionalInfo: { rspObj } }, req)
   var qs = {
     mode: 'edit'

@@ -61,6 +61,12 @@ module.exports = function (app) {
       requestMiddleware.createAndValidateRequestBody, requestMiddleware.validateToken,
       contentService.retireContentAPI)
 
+  app.route(BASE_URL + '/ca/retire')
+    .delete(healthService.checkDependantServiceHealth(dependentServiceHealth),
+      requestMiddleware.gzipCompression(),
+      requestMiddleware.createAndValidateRequestBody, requestMiddleware.validateToken,
+      contentService.retireCAContentAPI)
+
   app.route(BASE_URL + '/reject/:contentId')
     .post(healthService.checkDependantServiceHealth(dependentServiceHealth),
       requestMiddleware.gzipCompression(),

@@ -1074,6 +1074,152 @@ function retireContentAPI (req, response) {
   ])
 }
 
+function retireCAContentAPI (req, response) {
+  var data = req.body
+  var rspObj = req.rspObj
+  var failedContent = []
+  var userId = req.headers['x-authenticated-userid']
+  var errCode, errMsg, respCode, httpStatus
+
+  logger.debug({
+    msg: 'contentService.retireCAContentAPI() called', additionalInfo: { rspObj }
+  }, req)
+
+  if (!data.request || !data.request.contentIds) {
+    rspObj.errCode = contentMessage.RETIRE.MISSING_CODE
+    rspObj.errMsg = contentMessage.RETIRE.MISSING_MESSAGE
+    rspObj.responseCode = responseCode.CLIENT_ERROR
+    logger.error({
+      msg: 'Error due to required request ||  request.contentIds are missing',
+      err: {
+        errCode: rspObj.errCode,
+        errMsg: rspObj.errMsg,
+        responseCode: rspObj.responseCode
+      },
+      additionalInfo: { data }
+    }, req)
+    return response.status(400).send(respUtil.errorResponse(rspObj))
+  }
+
+  async.waterfall([
+
+    function (CBW) {
+      var ekStepReqData = {
+        request: {
+          filters: {
+            identifier: data.request.contentIds,
+            status: []
+          }
+        }
+      }
+      contentProvider.compositeSearchV4(ekStepReqData, req.headers, function (err, res) {
+        if (err || res.responseCode !== responseCode.SUCCESS) {
+          rspObj.errCode = res && res.params ? res.params.err : contentMessage.SEARCH.FAILED_CODE
+          rspObj.errMsg = res && res.params ? res.params.errmsg : contentMessage.SEARCH.FAILED_MESSAGE
+          rspObj.responseCode = res && res.responseCode ? res.responseCode : responseCode.SERVER_ERROR
+          logger.error({
+            msg: 'Getting error from content provider composite search',
+            err: {
+              err,
+              errCode: rspObj.errCode,
+              errMsg: rspObj.errMsg,
+              responseCode: rspObj.responseCode
+            },
+            additionalInfo: { ekStepReqData }
+          }, req)
+          var httpStatus = res && res.statusCode >= 100 && res.statusCode < 600 ? res.statusCode : 500
+          rspObj.result = res && res.result ? res.result : {}
+          rspObj = utilsService.getErrorResponse(rspObj, res)
+          return response.status(httpStatus).send(respUtil.errorResponse(rspObj))
+        } else {
+          CBW(null, res)
+        }
+      })
+    },
+
+    function (res, CBW) {
+      var createdByOfContents = _.uniq(_.pluck(res.result.content, 'createdBy'))
+      if (createdByOfContents.length === 1 && createdByOfContents[0] === userId) {
+        CBW(null, res)
+      } else {
+        rspObj.errCode = reqMsg.TOKEN.INVALID_CODE
+        rspObj.errMsg = reqMsg.TOKEN.INVALID_MESSAGE
+        rspObj.responseCode = responseCode.UNAUTHORIZED_ACCESS
+        return response.status(401).send(respUtil.errorResponse(rspObj))
+      }
+    },
+
+    function (res, CBW) {
+      // CA retire: status is intentionally not checked here - Comprehensive Assessment
+      // content can be retired from any status. Only courseCategory is enforced.
+      var isCAContent = _.every(res.result.content, function (content) {
+        return content.courseCategory === 'Comprehensive Assessment'
+      })
+      if (isCAContent) {
+        CBW()
+      } else {
+        rspObj.errCode = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_ONLY_CA_CODE
+        rspObj.errMsg = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_ONLY_CA_MESSAGE
+        rspObj.responseCode = responseCode.CLIENT_ERROR
+        return response.status(400).send(respUtil.errorResponse(rspObj))
+      }
+    },
+
+    function (CBW) {
+      async.each(data.request.contentIds, function (contentId, CBE) {
+        logger.debug({
+          msg: 'Request to content provider to retire CA content',
+          additionalInfo: {
+            contentId: contentId
+          }
+        }, req)
+
+        // Adding objectData in telemetry
+        if (rspObj.telemetryData) {
+          rspObj.telemetryData.object = utilsService.getObjectData(contentId, 'content', '', {})
+        }
+        contentProvider.retireContent(contentId, req.headers, function (err, res) {
+          if (err || res.responseCode !== responseCode.SUCCESS) {
+            errCode = res && res.params ? res.params.err : contentMessage.GET_MY.FAILED_CODE
+            errMsg = res && res.params ? res.params.errmsg : contentMessage.GET_MY.FAILED_MESSAGE
+            respCode = res && res.responseCode ? res.responseCode : responseCode.SERVER_ERROR
+            logger.error({
+              msg: 'Getting error from content provider while retiring CA content',
+              err: {
+                err,
+                errCode: rspObj.errCode,
+                errMsg: rspObj.errMsg,
+                responseCode: rspObj.responseCode
+              },
+              additionalInfo: { contentId }
+            }, req)
+            httpStatus = res && res.statusCode >= 100 && res.statusCode < 600 ? res.statusCode : 500
+            rspObj.result = res && res.result ? res.result : {}
+            failedContent.push({ contentId: contentId, errCode: errCode, errMsg: errMsg })
+          }
+          CBE(null, null)
+        })
+      }, function () {
+        if (failedContent.length > 0) {
+          rspObj.errCode = errCode
+          rspObj.errMsg = errMsg
+          rspObj.responseCode = respCode
+          rspObj.result = failedContent
+          return response.status(httpStatus).send(respUtil.errorResponse(rspObj))
+        } else {
+          CBW()
+        }
+      })
+    },
+    function () {
+      rspObj.result = failedContent
+      logger.debug({ msg: 'Sending response back to user', res: rspObj }, req)
+
+      return response.status(200).send(respUtil.successResponse(rspObj))
+    }
+  ])
+}
+
 function rejectContentAPI (req, response) {
   var data = {
     body: req.body
@@ -1979,6 +2125,7 @@ module.exports.publishContentAPI = publishContentAPI
 module.exports.getContentAPI = getContentAPI
 module.exports.getMyContentAPI = getMyContentAPI
 module.exports.retireContentAPI = retireContentAPI
+module.exports.retireCAContentAPI = retireCAContentAPI
 module.exports.rejectContentAPI = rejectContentAPI
 module.exports.flagContentAPI = flagContentAPI
 module.exports.acceptFlagContentAPI = acceptFlagContentAPI

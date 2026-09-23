@@ -412,7 +412,9 @@ exports.DOMAIN = {
     FAILED_CODE: 'ERR_RETIRE_OBJECT_TYPE_FAILED',
     FAILED_MESSAGE: 'Retire object type failed',
     RETIRE_ONLY_DRAFT_CODE: 'ERR_RETIRE_OBJECT_FAILED_DRAFT',
-    RETIRE_ONLY_DRAFT_MESSAGE: 'Status should be draft to retire'
+    RETIRE_ONLY_DRAFT_MESSAGE: 'Status should be draft to retire',
+    RETIRE_ONLY_CA_CODE: 'ERR_RETIRE_OBJECT_FAILED_NOT_CA',
+    RETIRE_ONLY_CA_MESSAGE: 'Only Comprehensive Assessment content can be retired using this API'
   }
 }
 

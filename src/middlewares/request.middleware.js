@@ -290,6 +290,7 @@ function apiAccessForReviewerUser (req, response, next) {
     mode: 'edit'
   }
   var contentMessage = messageUtil.CONTENT
+  var reviewableStatus = ['Review', 'FlagReview']
 
   data.contentId = req.params.contentId
 

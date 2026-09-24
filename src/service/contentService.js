@@ -1004,8 +1004,12 @@ function retireContentAPI (req, response) {
     },
 
     function (res, CBW) {
-      var status = _.uniq(_.pluck(res.result.content, 'status'))
-      if (status.length === 1 && status[0] === 'Draft') {
+      // Comprehensive Assessment content is exempt from the Draft-only retire restriction -
+      // it can be retired regardless of its current status.
+      var isValidForRetire = _.every(res.result.content, function (content) {
+        return content.status === 'Draft' || content.courseCategory === 'Comprehensive Assessment'
+      })
+      if (isValidForRetire) {
         CBW()
       } else {
         rspObj.errCode = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_ONLY_DRAFT_CODE

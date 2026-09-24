@@ -116,6 +116,23 @@ module.exports = function (app) {
     })
   )
 
+  app.use(
+    '/action/content/ca/v1/create',
+    requestMiddleware.validateUserToken,
+    proxy(contentServiceBaseUrl, {
+      limit: reqDataLimitOfContentUpload,
+      proxyReqOptDecorator: function (proxyReqOpts, srcReq) {
+        proxyReqOpts.headers['Authorization'] = contentRepoApiKey
+        return proxyReqOpts
+      },
+      proxyReqPathResolver: function (req) {
+        var originalUrl = req.originalUrl
+        originalUrl = originalUrl.replace('action/', '')
+        return require('url').parse(contentServiceBaseUrl + originalUrl).path
+      }
+    })
+  )
+
   app.use(['/action/content/v3/hierarchy/add', '/action/content/v3/hierarchy/remove'],
     requestMiddleware.validateUserToken,
     proxy(contentServiceBaseUrl, {
@@ -211,6 +228,19 @@ module.exports = function (app) {
     .route(
       '/action' + configUtil.getConfig('UPDATE_CONTENT_URI') + '/:contentId'
     )
+    .patch(
+      requestMiddleware.gzipCompression(),
+      requestMiddleware.createAndValidateRequestBody,
+      requestMiddleware.validateToken,
+      requestMiddleware.apiAccessForCreatorUser,
+      contentService.updateContentAPI
+    )
+
+  // CA entry point for the same update flow - contentService.updateContentAPI's downstream
+  // target is config-driven (UPDATE_CONTENT_URI), not derived from this route's path, so no
+  // knowledge-platform-side changes are needed to support this second entry point.
+  app
+    .route('/action/content/ca/v1/update/:contentId')
     .patch(
       requestMiddleware.gzipCompression(),
       requestMiddleware.createAndValidateRequestBody,

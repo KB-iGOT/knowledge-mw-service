@@ -290,7 +290,6 @@ function apiAccessForReviewerUser (req, response, next) {
     mode: 'edit'
   }
   var contentMessage = messageUtil.CONTENT
-  var reviewableStatus = ['Review', 'FlagReview']
 
   data.contentId = req.params.contentId
 
@@ -328,24 +327,6 @@ function apiAccessForReviewerUser (req, response, next) {
           additionalInfo: { courseCategory: res.result.content.courseCategory, userId: userId }
         }, req)
         return next()
-      }
-
-      // Only content in Review/FlagReview is eligible for the reviewer-publish flow.
-      // (Draft content is handled separately via apiAccessForOrgPublish.)
-      if (!lodash.includes(reviewableStatus, res.result.content.status)) {
-        rspObj.errCode = contentMessage.PUBLISH.NOT_IN_REVIEW_CODE
-        rspObj.errMsg = contentMessage.PUBLISH.NOT_IN_REVIEW_MESSAGE
-        rspObj.responseCode = responseCode.CLIENT_ERROR
-        logger.error({
-          msg: 'Publish denied - content not in Review/FlagReview status',
-          additionalInfo: { contentId: data.contentId, status: res.result.content.status },
-          err: {
-            errCode: rspObj.errCode,
-            errMsg: rspObj.errMsg,
-            responseCode: rspObj.responseCode
-          }
-        }, req)
-        return response.status(400).send(respUtil.errorResponse(rspObj))
       }
 
       if (res.result.content.createdBy === userId || lodash.includes(res.result.content.collaborators, userId)) {

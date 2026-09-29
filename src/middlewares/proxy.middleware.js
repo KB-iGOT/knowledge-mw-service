@@ -283,6 +283,21 @@ module.exports = function (app) {
       courseService.updateCourseHierarchyAPI
     )
 
+  // CA entry point for the same hierarchy-update flow - courseService.updateCourseHierarchyAPI's
+  // downstream target is config-driven (CONTENT_HIERARCHY_UPDATE_URI), not derived from this
+  // route's path, so no knowledge-platform-side changes are needed to support this second entry point.
+  app
+    .route(
+      '/action' + configUtil.getConfig('CA_CONTENT_HIERARCHY_UPDATE_URI') + '/'
+    )
+    .patch(
+      requestMiddleware.gzipCompression(),
+      requestMiddleware.createAndValidateRequestBody,
+      requestMiddleware.validateToken,
+      requestMiddleware.hierarchyUpdateApiAccess,
+      courseService.updateCourseHierarchyAPI
+    )
+
   app
     .route(
       '/action' +

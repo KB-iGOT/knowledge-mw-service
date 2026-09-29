@@ -25,6 +25,7 @@
         "LIST_ORDINALS_URI": "/meta/v3/ordinals/list",
         "CONTENT_UPLOAD_URL_URI": "/content/v3/upload/url",
         "CONTENT_HIERARCHY_UPDATE_URI": "/content/v3/hierarchy/update",
+        "CA_CONTENT_HIERARCHY_UPDATE_URI": "/content/ca/v1/hierarchy/update",
         "HEALTH_CHECK": "/health",
         "UNLISTED_PUBLISH_CONTENT_URI": "/content/v3/unlisted/publish",
         "GENERATE_DIALCODE_URI": "/dialcode/v3/generate",

@@ -1070,6 +1070,48 @@ function retireContentAPI (req, response) {
   ])
 }
 
+// true only if every creator is an MDO_ADMIN whose rootOrgId is the given org
+function areCreatorsMdoAdminsOfOrg (creatorIds, orgId, req, callback) {
+  var reqData = {
+    request: {
+      filters: { userId: creatorIds },
+      limit: creatorIds.length
+    }
+  }
+  var headers = lodash.omit(req.headers, 'accept-encoding')
+  contentProvider.userSearch(reqData, headers, function (err, res) {
+    if (err || !res || res.responseCode !== responseCode.SUCCESS) {
+      logger.error({
+        msg: 'User search failed while validating CA creators',
+        err: err || res,
+        additionalInfo: { creatorIds }
+      }, req)
+      return callback(new Error('USER_SEARCH_FAILED'))
+    }
+    var users = lodash.get(res, 'result.response.content', [])
+    var allowed = _.every(creatorIds, function (creatorId) {
+      var user = _.findWhere(users, { userId: creatorId }) || _.findWhere(users, { id: creatorId })
+      return !!user && user.rootOrgId === orgId && _.contains(getUserRoleNames(user), 'MDO_ADMIN')
+    })
+    callback(null, allowed)
+  })
+}
+
+// roles can come back as ['X'], [{ role: 'X' }] or nested under organisations[].roles
+function getUserRoleNames (user) {
+  var roles = _.map(user.roles || [], function (r) { return _.isString(r) ? r : r.role })
+  _.each(user.organisations || [], function (org) { roles = roles.concat(org.roles || []) })
+  return roles
+}
+
+function denyCARetire (req, response, rspObj, info) {
+  rspObj.errCode = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_CA_NOT_AUTHORIZED_CODE
+  rspObj.errMsg = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_CA_NOT_AUTHORIZED_MESSAGE
+  rspObj.responseCode = responseCode.UNAUTHORIZED_ACCESS
+  logger.error({ msg: 'CA retire denied', additionalInfo: info }, req)
+  return response.status(401).send(respUtil.errorResponse(rspObj))
+}
+
 function retireCAContentAPI (req, response) {
   var data = req.body
   var rspObj = req.rspObj
@@ -1134,15 +1176,49 @@ function retireCAContentAPI (req, response) {
     },
 
     function (res, CBW) {
-      var createdByOfContents = _.uniq(_.pluck(res.result.content, 'createdBy'))
-      if (createdByOfContents.length === 1 && createdByOfContents[0] === userId) {
-        CBW(null, res)
-      } else {
-        rspObj.errCode = reqMsg.TOKEN.INVALID_CODE
-        rspObj.errMsg = reqMsg.TOKEN.INVALID_MESSAGE
-        rspObj.responseCode = responseCode.UNAUTHORIZED_ACCESS
-        return response.status(401).send(respUtil.errorResponse(rspObj))
+      var contents = (res.result && res.result.content) || []
+
+      // every requested ID must come back from search, otherwise the gates below never see it
+      var missingIds = _.difference(data.request.contentIds, _.pluck(contents, 'identifier'))
+      if (missingIds.length > 0) {
+        rspObj.errCode = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_CA_NOT_FOUND_CODE
+        rspObj.errMsg = reqMsgRetire.RETIRE_OBJECT_TYPE.RETIRE_CA_NOT_FOUND_MESSAGE
+        rspObj.responseCode = responseCode.RESOURCE_NOT_FOUND
+        rspObj.result = { contentIds: missingIds }
+        return response.status(404).send(respUtil.errorResponse(rspObj))
       }
+
+      // content the caller created themselves needs no further check
+      var othersContent = _.filter(contents, function (content) {
+        return content.createdBy !== userId
+      })
+      if (othersContent.length === 0) {
+        return CBW(null, res)
+      }
+
+      // someone else's CA: only an MDO_LEADER may retire it, and only within their own MDO
+      var userRoles = (req.get('x-authenticated-user-roles') || '').split(',')
+      var userOrgId = req.get('x-authenticated-user-orgid')
+      var isSameOrg = _.every(othersContent, function (content) {
+        return content.channel === userOrgId
+      })
+      if (!_.contains(userRoles, 'MDO_LEADER') || !userOrgId || !isSameOrg) {
+        return denyCARetire(req, response, rspObj, { userId: userId, userOrgId: userOrgId })
+      }
+
+      var creatorIds = _.uniq(_.pluck(othersContent, 'createdBy'))
+      areCreatorsMdoAdminsOfOrg(creatorIds, userOrgId, req, function (err, allowed) {
+        if (err) {
+          rspObj.errCode = contentMessage.RETIRE.FAILED_CODE
+          rspObj.errMsg = contentMessage.RETIRE.FAILED_MESSAGE
+          rspObj.responseCode = responseCode.SERVER_ERROR
+          return response.status(500).send(respUtil.errorResponse(rspObj))
+        }
+        if (!allowed) {
+          return denyCARetire(req, response, rspObj, { userId: userId, userOrgId: userOrgId, creatorIds: creatorIds })
+        }
+        CBW(null, res)
+      })
     },
 
     function (res, CBW) {

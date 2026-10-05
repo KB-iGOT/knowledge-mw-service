@@ -14,6 +14,8 @@ var logger = require('sb_logger_util_v2')
 var validatorUtil = require('sb_req_validator_util')
 var _ = require('underscore')
 var lodash = require('lodash')
+var request = require('request')
+var configUtil = require('sb-config-util')
 
 var contentModel = require('../models/contentModel').CONTENT
 var messageUtils = require('./messageUtil')
@@ -1078,8 +1080,16 @@ function areCreatorsMdoAdminsOfOrg (creatorIds, orgId, req, callback) {
       limit: creatorIds.length
     }
   }
-  var headers = lodash.omit(req.headers, 'accept-encoding')
-  contentProvider.userSearch(reqData, headers, function (err, res) {
+  // private endpoint: validateToken has already stripped x-authenticated-user-token,
+  // which the public /v1/user/search requires
+  var httpOptions = {
+    url: configUtil.getConfig('LEARNER_SERVICE_LOCAL_BASE_URL') + '/private/user/v1/search',
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    body: reqData,
+    json: true
+  }
+  request(httpOptions, function (err, httpResponse, res) {
     if (err || !res || res.responseCode !== responseCode.SUCCESS) {
       logger.error({
         msg: 'User search failed while validating CA creators',

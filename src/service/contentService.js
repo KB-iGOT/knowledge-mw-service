@@ -1200,7 +1200,7 @@ function retireCAContentAPI (req, response) {
       var userRoles = (req.get('x-authenticated-user-roles') || '').split(',')
       var userOrgId = req.get('x-authenticated-user-orgid')
       var isSameOrg = _.every(othersContent, function (content) {
-        return content.channel === userOrgId
+        return lodash.includes(content.createdFor, userOrgId)
       })
       if (!_.contains(userRoles, 'MDO_LEADER') || !userOrgId || !isSameOrg) {
         return denyCARetire(req, response, rspObj, { userId: userId, userOrgId: userOrgId })

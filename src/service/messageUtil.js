@@ -414,7 +414,11 @@ exports.DOMAIN = {
     RETIRE_ONLY_DRAFT_CODE: 'ERR_RETIRE_OBJECT_FAILED_DRAFT',
     RETIRE_ONLY_DRAFT_MESSAGE: 'Status should be draft to retire',
     RETIRE_ONLY_CA_CODE: 'ERR_RETIRE_OBJECT_FAILED_NOT_CA',
-    RETIRE_ONLY_CA_MESSAGE: 'Only Comprehensive Assessment content can be retired using this API'
+    RETIRE_ONLY_CA_MESSAGE: 'Only Comprehensive Assessment content can be retired using this API',
+    RETIRE_CA_NOT_FOUND_CODE: 'ERR_RETIRE_CA_NOT_FOUND',
+    RETIRE_CA_NOT_FOUND_MESSAGE: 'One or more contentIds were not found',
+    RETIRE_CA_NOT_AUTHORIZED_CODE: 'ERR_RETIRE_CA_NOT_AUTHORIZED',
+    RETIRE_CA_NOT_AUTHORIZED_MESSAGE: 'Only the creator, or an MDO Leader for CAs created by its MDO Admins, can retire'
   }
 }
 

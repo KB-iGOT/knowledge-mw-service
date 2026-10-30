@@ -1,6 +1,8 @@
 var cassandra = require('express-cassandra')
 var _ = require('lodash')
 var contactPoints = process.env.sunbird_cassandra_urls.split(',')
+// cassandra-driver 4.x requires the local DC name for its default DC-aware load balancing policy
+var localDataCenter = process.env.sunbird_cassandra_local_datacenter || 'datacenter1'
 var cassandraDriver = require('cassandra-driver')
 var consistency = getConsistencyLevel(process.env.sunbird_cassandra_consistency_level)
 var envReplicationStrategy = process.env.sunbird_cassandra_replication_strategy ||
@@ -20,6 +22,7 @@ _.forEach(keyspaceConfig, config => {
   var models = cassandra.createClient({
     clientOptions: {
       contactPoints: contactPoints,
+      localDataCenter: localDataCenter,
       keyspace: config.name,
       queryOptions: { consistency: consistency }
     },
